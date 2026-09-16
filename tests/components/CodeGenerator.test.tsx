@@ -229,4 +229,13 @@ describe("CodeGenerator", () => {
     // After closing, the dropdown items are gone
     expect(pythonItems.length).toBe(0);
   });
+
+  test("closes modal on Escape key press", () => {
+    const onClose = mock(() => {});
+    render(
+      <CodeGenerator isOpen onClose={onClose} tablePath={["app", "users"]} tableSchema={schema} />,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Code, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CopyButton } from "@/components/copy-button";
@@ -265,6 +265,17 @@ export function CodeGenerator({ isOpen, onClose, tablePath, tableSchema, databas
     if (!tableSchema) return "// No schema available";
     return generateCode(language, tableSchema);
   }, [language, tableSchema]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (event.defaultPrevented) return;
+      onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
