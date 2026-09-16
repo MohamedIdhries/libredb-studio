@@ -979,4 +979,39 @@ describe("DataProfiler", () => {
       download.restore();
     }
   });
+
+  // ── Column icon selection by col.type ──────────────────────────────────────
+
+  test("renders column icons according to col.type", async () => {
+    const profileWithDifferentTypes = {
+      tableName: "all_types",
+      totalRows: 10,
+      columns: [
+        { name: "num_col", type: "INTEGER", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "str_col", type: "VARCHAR(50)", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "date_col", type: "TIMESTAMP", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "bool_col", type: "BOOLEAN", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 2 },
+      ],
+    };
+
+    restoreGlobalFetch();
+    mockGlobalFetch({
+      "/api/db/profile": { ok: true, json: profileWithDifferentTypes },
+      "/api/ai/describe-schema": { ok: false, status: 500, json: { error: "AI not configured" } },
+    });
+
+    const props = createDefaultProps();
+    const { container } = render(<DataProfiler {...props} />);
+    const view = within(container);
+
+    await waitFor(() => {
+      expect(view.queryByText("num_col")).not.toBeNull();
+      expect(view.queryByText("str_col")).not.toBeNull();
+      expect(view.queryByText("date_col")).not.toBeNull();
+      expect(view.queryByText("bool_col")).not.toBeNull();
+    });
+
+    const icons = container.querySelectorAll("div.flex.items-center.gap-2 > svg");
+    expect(icons.length).toBeGreaterThanOrEqual(4);
+  });
 });

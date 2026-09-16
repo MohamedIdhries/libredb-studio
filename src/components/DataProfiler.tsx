@@ -2,7 +2,7 @@
 
 import { appFetch } from "@/lib/config/base-path";
 import { useState, useEffect, useMemo } from "react";
-import { LoaderCircle, ChartColumn, X, Hash, CircleAlert, Sparkles, Lock, Download } from "lucide-react";
+import { LoaderCircle, ChartColumn, X, Hash, Type, Calendar, ToggleLeft, FileText, CircleAlert, Sparkles, Lock, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DatabaseConnection } from "@/lib/types";
 import { objectPathLabel, pathKey } from "@/lib/db/object-path";
@@ -37,6 +37,27 @@ interface DataProfilerProps {
   onProfile?: (params: { connectionId: string; tablePath: readonly string[] }) => Promise<ProfileData>;
   /** Optional API adapter: when provided, bypasses the built-in /api/ai/describe-schema fetch. */
   onDescribeSchema?: (params: { tableName: string; schemaContext: string }) => Promise<string>;
+}
+
+function getColumnIcon(type?: string) {
+  if (!type) return FileText;
+  const t = type.toLowerCase();
+  if (
+    t.includes("int") ||
+    t.includes("float") ||
+    t.includes("double") ||
+    t.includes("decimal") ||
+    t.includes("numeric") ||
+    t.includes("real") ||
+    t.includes("serial") ||
+    t.includes("number")
+  ) {
+    return Hash;
+  }
+  if (t.includes("bool")) return ToggleLeft;
+  if (t.includes("date") || t.includes("time") || t.includes("timestamp")) return Calendar;
+  if (t.includes("char") || t.includes("text") || t.includes("string") || t.includes("varchar")) return Type;
+  return FileText;
 }
 
 export function DataProfiler({
@@ -323,25 +344,27 @@ export function DataProfiler({
                 {/* Column Profiles */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-medium text-fg-tertiary">Column Profiles</h3>
-                  {profile.columns.map((col) => (
-                    <div key={col.name} className="bg-surface rounded-lg p-3 border border-hairline">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Hash strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
-                          <span className="text-xs font-medium text-fg">{col.name}</span>
-                          {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
-                          {sensitiveColumnNames.has(col.name) && (
-                            <span title="Sensitive column - values masked">
-                              <Lock strokeWidth={1.5} className="w-3 h-3 text-hue-purple" />
-                            </span>
-                          )}
+                  {profile.columns.map((col) => {
+                    const ColumnIcon = getColumnIcon(col.type);
+                    return (
+                      <div key={col.name} className="bg-surface rounded-lg p-3 border border-hairline">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ColumnIcon strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
+                            <span className="text-xs font-medium text-fg">{col.name}</span>
+                            {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
+                            {sensitiveColumnNames.has(col.name) && (
+                              <span title="Sensitive column - values masked">
+                                <Lock strokeWidth={1.5} className="w-3 h-3 text-hue-purple" />
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-fg-muted">{col.distinctCount.toLocaleString()} distinct</span>
                         </div>
-                        <span className="text-xs text-fg-muted">{col.distinctCount.toLocaleString()} distinct</span>
-                      </div>
 
-                      {col.error ? (
-                        <p className="text-xs text-warning">{col.error}</p>
-                      ) : (
+                        {col.error ? (
+                          <p className="text-xs text-warning">{col.error}</p>
+                        ) : (
                         <>
                           {/* Null bar */}
                           <div className="flex items-center gap-2 mb-1.5">
@@ -429,7 +452,8 @@ export function DataProfiler({
                         </>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
 
                 {/* AI Summary */}
