@@ -2,7 +2,20 @@
 
 import { appFetch } from "@/lib/config/base-path";
 import { useState, useEffect, useMemo } from "react";
-import { LoaderCircle, ChartColumn, X, Hash, Type, Calendar, ToggleLeft, FileText, CircleAlert, Sparkles, Lock, Download } from "lucide-react";
+import {
+  LoaderCircle,
+  ChartColumn,
+  X,
+  Hash,
+  Type,
+  Calendar,
+  ToggleLeft,
+  FileText,
+  CircleAlert,
+  Sparkles,
+  Lock,
+  Download,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DatabaseConnection } from "@/lib/types";
 import { objectPathLabel, pathKey } from "@/lib/db/object-path";
@@ -41,7 +54,24 @@ interface DataProfilerProps {
 
 function getColumnIcon(type?: string) {
   if (!type) return FileText;
-  const t = type.toLowerCase();
+  const t = type.toLowerCase().trim();
+
+  // Handle interval & point/spatial before numeric branch ("interval" contains "int", "point" contains "int")
+  if (t.includes("interval")) return Calendar;
+  if (
+    t.includes("point") ||
+    t.includes("geometry") ||
+    t.includes("geography") ||
+    t.includes("polygon") ||
+    t.includes("linestring")
+  ) {
+    return FileText;
+  }
+
+  // Boolean flags
+  if (t.includes("bool") || t === "boolean") return ToggleLeft;
+
+  // Numeric types (including money & bit)
   if (
     t.includes("int") ||
     t.includes("float") ||
@@ -50,13 +80,34 @@ function getColumnIcon(type?: string) {
     t.includes("numeric") ||
     t.includes("real") ||
     t.includes("serial") ||
-    t.includes("number")
+    t.includes("number") ||
+    t.includes("money") ||
+    t.includes("dec") ||
+    t.includes("bit")
   ) {
     return Hash;
   }
-  if (t.includes("bool")) return ToggleLeft;
-  if (t.includes("date") || t.includes("time") || t.includes("timestamp")) return Calendar;
-  if (t.includes("char") || t.includes("text") || t.includes("string") || t.includes("varchar")) return Type;
+
+  // Date and Time types
+  if (t.includes("date") || t.includes("time") || t.includes("timestamp") || t.includes("year")) return Calendar;
+
+  // Strings, Enums, UUIDs
+  if (
+    t.includes("char") ||
+    t.includes("text") ||
+    t.includes("string") ||
+    t.includes("varchar") ||
+    t.includes("enum") ||
+    t.includes("uuid") ||
+    t.includes("guid") ||
+    t.includes("clob")
+  ) {
+    return Type;
+  }
+
+  // Documents / Semi-structured data / default
+  if (t.includes("json") || t.includes("xml") || t.includes("blob") || t.includes("bytea")) return FileText;
+
   return FileText;
 }
 
@@ -86,6 +137,15 @@ export function DataProfiler({
   const sensitiveColumnNames = useMemo(() => {
     if (!tableSchema?.columns) return new Map();
     return detectSensitiveColumns(tableSchema.columns.map((c) => c.name));
+  }, [tableSchema]);
+
+  // Fallback map from tableSchema column names to column types (SQL profiler response omits col.type)
+  const columnTypes = useMemo(() => {
+    const types = new Map<string, string>();
+    for (const c of tableSchema?.columns ?? []) {
+      types.set(c.name, c.type);
+    }
+    return types;
   }, [tableSchema]);
 
   const exportProfile = (format: "csv" | "json") => {
@@ -345,14 +405,15 @@ export function DataProfiler({
                 <div className="space-y-2">
                   <h3 className="text-xs font-medium text-fg-tertiary">Column Profiles</h3>
                   {profile.columns.map((col) => {
-                    const ColumnIcon = getColumnIcon(col.type);
+                    const resolvedType = col.type ?? columnTypes.get(col.name);
+                    const ColumnIcon = getColumnIcon(resolvedType);
                     return (
                       <div key={col.name} className="bg-surface rounded-lg p-3 border border-hairline">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <ColumnIcon strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
                             <span className="text-xs font-medium text-fg">{col.name}</span>
-                            {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
+                            {resolvedType && <span className="text-xs text-fg-muted font-mono">{resolvedType}</span>}
                             {sensitiveColumnNames.has(col.name) && (
                               <span title="Sensitive column - values masked">
                                 <Lock strokeWidth={1.5} className="w-3 h-3 text-hue-purple" />
@@ -365,95 +426,95 @@ export function DataProfiler({
                         {col.error ? (
                           <p className="text-xs text-warning">{col.error}</p>
                         ) : (
-                        <>
-                          {/* Null bar */}
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className="flex-1 h-1.5 bg-overlay rounded-full overflow-hidden">
-                              <div
+                          <>
+                            {/* Null bar */}
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <div className="flex-1 h-1.5 bg-overlay rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all",
+                                    col.nullPercent > 50
+                                      ? "bg-danger-tint"
+                                      : col.nullPercent > 20
+                                        ? "bg-warning-tint"
+                                        : "bg-success-tint",
+                                  )}
+                                  style={{ width: `${100 - col.nullPercent}%` }}
+                                />
+                              </div>
+                              <span
                                 className={cn(
-                                  "h-full rounded-full transition-all",
+                                  "text-xs font-mono w-10 text-right",
                                   col.nullPercent > 50
-                                    ? "bg-danger-tint"
+                                    ? "text-danger"
                                     : col.nullPercent > 20
-                                      ? "bg-warning-tint"
-                                      : "bg-success-tint",
+                                      ? "text-warning"
+                                      : "text-success",
                                 )}
-                                style={{ width: `${100 - col.nullPercent}%` }}
-                              />
+                              >
+                                {col.nullPercent}% null
+                              </span>
                             </div>
-                            <span
-                              className={cn(
-                                "text-xs font-mono w-10 text-right",
-                                col.nullPercent > 50
-                                  ? "text-danger"
-                                  : col.nullPercent > 20
-                                    ? "text-warning"
-                                    : "text-success",
-                              )}
-                            >
-                              {col.nullPercent}% null
-                            </span>
-                          </div>
 
-                          {/* Min/Max */}
-                          <div className="flex gap-4 text-xs">
-                            {col.minValue &&
-                              (() => {
-                                const rule = sensitiveColumnNames.get(col.name);
-                                const display = rule ? maskValue(col.minValue, rule) : col.minValue.substring(0, 30);
-                                return (
-                                  <span className="text-fg-muted">
-                                    min:{" "}
+                            {/* Min/Max */}
+                            <div className="flex gap-4 text-xs">
+                              {col.minValue &&
+                                (() => {
+                                  const rule = sensitiveColumnNames.get(col.name);
+                                  const display = rule ? maskValue(col.minValue, rule) : col.minValue.substring(0, 30);
+                                  return (
+                                    <span className="text-fg-muted">
+                                      min:{" "}
+                                      <span
+                                        className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
+                                      >
+                                        {display}
+                                      </span>
+                                    </span>
+                                  );
+                                })()}
+                              {col.maxValue &&
+                                (() => {
+                                  const rule = sensitiveColumnNames.get(col.name);
+                                  const display = rule ? maskValue(col.maxValue, rule) : col.maxValue.substring(0, 30);
+                                  return (
+                                    <span className="text-fg-muted">
+                                      max:{" "}
+                                      <span
+                                        className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
+                                      >
+                                        {display}
+                                      </span>
+                                    </span>
+                                  );
+                                })()}
+                            </div>
+
+                            {/* Sample Values */}
+                            {col.sampleValues && col.sampleValues.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {col.sampleValues.map((val, i) => {
+                                  const rule = sensitiveColumnNames.get(col.name);
+                                  const display = rule ? maskValue(val, rule) : val.substring(0, 20);
+                                  return (
                                     <span
-                                      className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
+                                      key={i}
+                                      className={cn(
+                                        "text-xs px-1.5 py-0.5 bg-overlay rounded font-mono",
+                                        rule ? "text-fg-muted italic" : "text-fg-tertiary",
+                                      )}
                                     >
                                       {display}
                                     </span>
-                                  </span>
-                                );
-                              })()}
-                            {col.maxValue &&
-                              (() => {
-                                const rule = sensitiveColumnNames.get(col.name);
-                                const display = rule ? maskValue(col.maxValue, rule) : col.maxValue.substring(0, 30);
-                                return (
-                                  <span className="text-fg-muted">
-                                    max:{" "}
-                                    <span
-                                      className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
-                                    >
-                                      {display}
-                                    </span>
-                                  </span>
-                                );
-                              })()}
-                          </div>
-
-                          {/* Sample Values */}
-                          {col.sampleValues && col.sampleValues.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {col.sampleValues.map((val, i) => {
-                                const rule = sensitiveColumnNames.get(col.name);
-                                const display = rule ? maskValue(val, rule) : val.substring(0, 20);
-                                return (
-                                  <span
-                                    key={i}
-                                    className={cn(
-                                      "text-xs px-1.5 py-0.5 bg-overlay rounded font-mono",
-                                      rule ? "text-fg-muted italic" : "text-fg-tertiary",
-                                    )}
-                                  >
-                                    {display}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* AI Summary */}

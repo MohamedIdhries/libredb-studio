@@ -980,38 +980,48 @@ describe("DataProfiler", () => {
     }
   });
 
-  // ── Column icon selection by col.type ──────────────────────────────────────
+  // ── Column icon selection and schema type fallback ─────────────────────────
 
-  test("renders column icons according to col.type", async () => {
-    const profileWithDifferentTypes = {
-      tableName: "all_types",
+  test("renders column icons according to tableSchema fallback when col.type is missing", async () => {
+    const profileWithoutTypeFields = {
+      tableName: "users",
       totalRows: 10,
       columns: [
-        { name: "num_col", type: "INTEGER", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
-        { name: "str_col", type: "VARCHAR(50)", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
-        { name: "date_col", type: "TIMESTAMP", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
-        { name: "bool_col", type: "BOOLEAN", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 2 },
+        { name: "id", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "name", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "created_at", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "is_active", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 2 },
       ],
     };
 
     restoreGlobalFetch();
     mockGlobalFetch({
-      "/api/db/profile": { ok: true, json: profileWithDifferentTypes },
+      "/api/db/profile": { ok: true, json: profileWithoutTypeFields },
       "/api/ai/describe-schema": { ok: false, status: 500, json: { error: "AI not configured" } },
     });
 
-    const props = createDefaultProps();
+    const props = createDefaultProps({
+      tablePath: ["public", "users"],
+      tableSchema: mockUsersTable,
+    });
     const { container } = render(<DataProfiler {...props} />);
     const view = within(container);
 
     await waitFor(() => {
-      expect(view.queryByText("num_col")).not.toBeNull();
-      expect(view.queryByText("str_col")).not.toBeNull();
-      expect(view.queryByText("date_col")).not.toBeNull();
-      expect(view.queryByText("bool_col")).not.toBeNull();
+      expect(view.queryByText("id")).not.toBeNull();
+      expect(view.queryByText("name")).not.toBeNull();
+      expect(view.queryByText("created_at")).not.toBeNull();
+      expect(view.queryByText("is_active")).not.toBeNull();
     });
 
-    const icons = container.querySelectorAll("div.flex.items-center.gap-2 > svg");
-    expect(icons.length).toBeGreaterThanOrEqual(4);
+    const idContainer = view.getByText("id").closest(".flex.items-center.gap-2");
+    const nameContainer = view.getByText("name").closest(".flex.items-center.gap-2");
+    const createdAtContainer = view.getByText("created_at").closest(".flex.items-center.gap-2");
+    const isActiveContainer = view.getByText("is_active").closest(".flex.items-center.gap-2");
+
+    expect(idContainer?.querySelector("svg")?.classList.contains("lucide-hash")).toBe(true);
+    expect(nameContainer?.querySelector("svg")?.classList.contains("lucide-type")).toBe(true);
+    expect(createdAtContainer?.querySelector("svg")?.classList.contains("lucide-calendar")).toBe(true);
+    expect(isActiveContainer?.querySelector("svg")?.classList.contains("lucide-toggle-left")).toBe(true);
   });
 });
