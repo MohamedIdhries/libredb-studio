@@ -17,6 +17,7 @@ import React from "react";
 import { mockGlobalFetch, restoreGlobalFetch, type MockFetchResponse } from "../helpers/mock-fetch";
 
 import { DataProfiler } from "@/components/DataProfiler";
+import type { DetailedObject } from "@/lib/db/detailed-object";
 import { detectSensitiveColumns, maskValue } from "@/lib/data-masking";
 import { mockPostgresConnection } from "../fixtures/connections";
 import { mockUsersTable } from "../fixtures/schemas";
@@ -983,6 +984,18 @@ describe("DataProfiler", () => {
   // ── Column icon selection and schema type fallback ─────────────────────────
 
   test("renders column icons according to tableSchema fallback when col.type is missing", async () => {
+    const tableWithAllTypes: DetailedObject = {
+      ...mockUsersTable,
+      columns: [
+        { name: "id", type: "integer", nullable: false, isPrimary: true },
+        { name: "name", type: "varchar(255)", nullable: false, isPrimary: false },
+        { name: "created_at", type: "timestamp", nullable: false, isPrimary: false },
+        { name: "is_active", type: "boolean", nullable: false, isPrimary: false },
+        { name: "duration", type: "interval", nullable: true, isPrimary: false },
+        { name: "location", type: "point", nullable: true, isPrimary: false },
+      ],
+    };
+
     const profileWithoutTypeFields = {
       tableName: "users",
       totalRows: 10,
@@ -991,6 +1004,8 @@ describe("DataProfiler", () => {
         { name: "name", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
         { name: "created_at", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
         { name: "is_active", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 2 },
+        { name: "duration", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 5 },
+        { name: "location", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 8 },
       ],
     };
 
@@ -1002,7 +1017,7 @@ describe("DataProfiler", () => {
 
     const props = createDefaultProps({
       tablePath: ["public", "users"],
-      tableSchema: mockUsersTable,
+      tableSchema: tableWithAllTypes,
     });
     const { container } = render(<DataProfiler {...props} />);
     const view = within(container);
@@ -1012,16 +1027,22 @@ describe("DataProfiler", () => {
       expect(view.queryByText("name")).not.toBeNull();
       expect(view.queryByText("created_at")).not.toBeNull();
       expect(view.queryByText("is_active")).not.toBeNull();
+      expect(view.queryByText("duration")).not.toBeNull();
+      expect(view.queryByText("location")).not.toBeNull();
     });
 
     const idContainer = view.getByText("id").closest(".flex.items-center.gap-2");
     const nameContainer = view.getByText("name").closest(".flex.items-center.gap-2");
     const createdAtContainer = view.getByText("created_at").closest(".flex.items-center.gap-2");
     const isActiveContainer = view.getByText("is_active").closest(".flex.items-center.gap-2");
+    const durationContainer = view.getByText("duration").closest(".flex.items-center.gap-2");
+    const locationContainer = view.getByText("location").closest(".flex.items-center.gap-2");
 
     expect(idContainer?.querySelector("svg")?.classList.contains("lucide-hash")).toBe(true);
     expect(nameContainer?.querySelector("svg")?.classList.contains("lucide-type")).toBe(true);
     expect(createdAtContainer?.querySelector("svg")?.classList.contains("lucide-calendar")).toBe(true);
     expect(isActiveContainer?.querySelector("svg")?.classList.contains("lucide-toggle-left")).toBe(true);
+    expect(durationContainer?.querySelector("svg")?.classList.contains("lucide-calendar")).toBe(true);
+    expect(locationContainer?.querySelector("svg")?.classList.contains("lucide-file-text")).toBe(true);
   });
 });

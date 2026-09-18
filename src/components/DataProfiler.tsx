@@ -56,17 +56,9 @@ function getColumnIcon(type?: string) {
   if (!type) return FileText;
   const t = type.toLowerCase().trim();
 
-  // Handle interval & point/spatial before numeric branch ("interval" contains "int", "point" contains "int")
+  // Handle interval & point before numeric branch ("interval" contains "int", "point" contains "int")
   if (t.includes("interval")) return Calendar;
-  if (
-    t.includes("point") ||
-    t.includes("geometry") ||
-    t.includes("geography") ||
-    t.includes("polygon") ||
-    t.includes("linestring")
-  ) {
-    return FileText;
-  }
+  if (t.includes("point")) return FileText;
 
   // Boolean flags
   if (t.includes("bool") || t === "boolean") return ToggleLeft;
@@ -104,9 +96,6 @@ function getColumnIcon(type?: string) {
   ) {
     return Type;
   }
-
-  // Documents / Semi-structured data / default
-  if (t.includes("json") || t.includes("xml") || t.includes("blob") || t.includes("bytea")) return FileText;
 
   return FileText;
 }
@@ -413,7 +402,7 @@ export function DataProfiler({
                           <div className="flex items-center gap-2">
                             <ColumnIcon strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
                             <span className="text-xs font-medium text-fg">{col.name}</span>
-                            {resolvedType && <span className="text-xs text-fg-muted font-mono">{resolvedType}</span>}
+                            {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
                             {sensitiveColumnNames.has(col.name) && (
                               <span title="Sensitive column - values masked">
                                 <Lock strokeWidth={1.5} className="w-3 h-3 text-hue-purple" />
